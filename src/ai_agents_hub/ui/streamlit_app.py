@@ -10,6 +10,7 @@ from ai_agents_hub.agents.code_analysis_agent import create_code_analysis_agent
 from ai_agents_hub.agents.code_review_agent import create_code_review_agent
 from ai_agents_hub.agents.knowledge_agent import create_knowledge_agent
 from ai_agents_hub.agents.chat_agent import create_chat_agent, process_chat
+from ai_agents_hub.agents.adaptive_learning_agent import create_adaptive_learning_agent, process_learning
 
 # Enable tracemalloc for better resource tracking
 tracemalloc.start()
@@ -30,6 +31,8 @@ def init_session_state():
         st.session_state.code_analysis_agent_initialized = False
         st.session_state.code_review_agent_initialized = False
         st.session_state.chat_agent_initialized = False
+        st.session_state.adaptive_learning_initialized = False
+        st.session_state.current_student_id = None
 
 def handle_knowledge_agent():
     """Handle Knowledge Agent interactions."""
@@ -169,6 +172,73 @@ def handle_chat_agent():
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
+def handle_adaptive_learning():
+    """Handle Adaptive Learning Agent interactions."""
+    if not st.session_state.get("adaptive_learning_initialized"):
+        with st.spinner("Initializing Adaptive Learning Agent..."):
+            try:
+                st.session_state.adaptive_learning_agent = create_adaptive_learning_agent()
+                st.session_state.adaptive_learning_initialized = True
+            except Exception as e:
+                st.error(f"Error initializing Adaptive Learning Agent: {str(e)}")
+                st.stop()
+    
+    # Student ID input
+    if not st.session_state.current_student_id:
+        student_id = st.text_input("Enter Student ID:")
+        if student_id:
+            st.session_state.current_student_id = student_id
+    
+    if st.session_state.current_student_id:
+        # Topic selection
+        topic = st.text_input("Enter Learning Topic:")
+        
+        if topic:
+            if st.button("Start Learning Session"):
+                with st.spinner("Processing learning session..."):
+                    try:
+                        results = process_learning(st.session_state.current_student_id, topic)
+                        
+                        # Display results in an organized way
+                        st.subheader("Learning Session Results")
+                        
+                        # Assessment
+                        if results.get("assessment"):
+                            st.write("📊 Current Level:", results["assessment"])
+                        
+                        # Content
+                        if results.get("content"):
+                            st.write("📚 Learning Content:", results["content"])
+                        
+                        # Performance
+                        if results.get("performance"):
+                            st.write("📈 Performance:", results["performance"])
+                        
+                        # Adaptation
+                        if results.get("adaptation"):
+                            st.write("🔄 Next Steps:", results["adaptation"])
+                        
+                        # Error handling
+                        if results.get("error"):
+                            st.error(f"Error during learning session: {results['error']}")
+                        
+                        # Add to message history
+                        message = f"""Learning Session Summary:
+                        Topic: {topic}
+                        Level: {results.get('assessment', 'N/A')}
+                        Performance: {results.get('performance', 'N/A')}
+                        Next Steps: {results.get('adaptation', 'N/A')}
+                        """
+                        st.session_state.messages.append({"role": "assistant", "content": message})
+                        
+                    except Exception as e:
+                        st.error(f"Error during learning session: {str(e)}")
+        
+        # Option to reset student
+        if st.button("Change Student"):
+            st.session_state.current_student_id = None
+            st.rerun()
+
 def main():
     """Main application entry point."""
     st.title("AI Agents Hub")
@@ -178,7 +248,7 @@ def main():
     # Agent selection
     agent_type = st.sidebar.selectbox(
         "Select Agent Type",
-        ["General Chat", "Knowledge Agent", "Code Analysis", "Code Review"],
+        ["General Chat", "Knowledge Agent", "Code Analysis", "Code Review", "Adaptive Learning"],
         index=0  # Make General Chat the default
     )
 
@@ -195,8 +265,10 @@ def main():
         handle_knowledge_agent()
     elif agent_type == "Code Analysis":
         handle_code_analysis()
-    else:  # Code Review
+    elif agent_type == "Code Review":
         handle_code_review()
+    else:  # Adaptive Learning
+        handle_adaptive_learning()
 
 if __name__ == "__main__":
     main()
