@@ -1,8 +1,8 @@
-from praisonaiagents import Agent
+"""Configuration management for AI Agents Hub."""
 
-def create_knowledge_agent():
-    """Create a knowledge agent specifically for handling PDF and knowledge-based queries"""
-    config = {
+def get_agent_config():
+    """Get the base configuration for AI agents."""
+    return {
         "vector_store": {
             "provider": "chroma",
             "config": {
@@ -28,12 +28,3 @@ def create_knowledge_agent():
             },
         },
     }
-    
-    return Agent(
-        name="Knowledge Agent",
-        instructions="You answer questions based on the provided knowledge.",
-        knowledge=["Efficient Document Retrieval with Vision Language Models.pdf"],
-        knowledge_config=config,
-        user_id="user1",
-        llm="deepseek-r1"
-    )

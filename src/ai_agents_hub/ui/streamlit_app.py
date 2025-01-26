@@ -1,11 +1,15 @@
+"""Streamlit UI for AI Agents Hub."""
+
 import streamlit as st
-from code_analysis_agent import create_code_analysis_agent
-from code_review_agent import create_code_review_agent
-from knowledge_agent import create_knowledge_agent
-import tracemalloc
-import warnings
 from rich.console import Console
 import sys
+import tracemalloc
+import warnings
+
+from ai_agents_hub.agents.code_analysis_agent import create_code_analysis_agent
+from ai_agents_hub.agents.code_review_agent import create_code_review_agent
+from ai_agents_hub.agents.knowledge_agent import create_knowledge_agent
+from ai_agents_hub.agents.chat_agent import create_chat_agent, process_chat
 
 # Enable tracemalloc for better resource tracking
 tracemalloc.start()
@@ -17,29 +21,18 @@ warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*s
 console = Console(force_terminal=False)
 sys.stdout = console.file
 
-st.title("AI Agents Hub")
+def init_session_state():
+    """Initialize Streamlit session state."""
+    if "agents_initialized" not in st.session_state:
+        st.session_state.messages = []
+        st.session_state.agents_initialized = True
+        st.session_state.knowledge_agent_initialized = False
+        st.session_state.code_analysis_agent_initialized = False
+        st.session_state.code_review_agent_initialized = False
+        st.session_state.chat_agent_initialized = False
 
-# Initialize agents with proper resource management
-if "agents_initialized" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.agents_initialized = True
-    st.session_state.knowledge_agent_initialized = False
-    st.session_state.code_analysis_agent_initialized = False
-    st.session_state.code_review_agent_initialized = False
-
-# Agent selection
-agent_type = st.sidebar.radio(
-    "Select Agent Type",
-    ["Knowledge Agent", "Code Analysis", "Code Review"]
-)
-
-if "messages" in st.session_state:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-# Input section based on agent type
-if agent_type == "Knowledge Agent":
+def handle_knowledge_agent():
+    """Handle Knowledge Agent interactions."""
     if not st.session_state.get("knowledge_agent_initialized"):
         with st.spinner("Initializing Knowledge Agent..."):
             try:
@@ -67,7 +60,8 @@ if agent_type == "Knowledge Agent":
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
-elif agent_type == "Code Analysis":
+def handle_code_analysis():
+    """Handle Code Analysis Agent interactions."""
     if not st.session_state.get("code_analysis_agent_initialized"):
         with st.spinner("Initializing Code Analysis Agent..."):
             try:
@@ -103,7 +97,8 @@ elif agent_type == "Code Analysis":
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
-else:  # Code Review
+def handle_code_review():
+    """Handle Code Review Agent interactions."""
     if not st.session_state.get("code_review_agent_initialized"):
         with st.spinner("Initializing Code Review Agent..."):
             try:
@@ -144,3 +139,64 @@ else:  # Code Review
                 error_msg = f"Error reviewing code: {str(e)}"
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
+def handle_chat_agent():
+    """Handle Chat Agent interactions."""
+    if not st.session_state.get("chat_agent_initialized"):
+        with st.spinner("Initializing Chat Agent..."):
+            try:
+                st.session_state.chat_agent = create_chat_agent()
+                st.session_state.chat_agent_initialized = True
+            except Exception as e:
+                st.error(f"Error initializing Chat Agent: {str(e)}")
+                st.stop()
+
+    prompt = st.chat_input("Type your message here...")
+    
+    if prompt:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            try:
+                with st.spinner("Thinking..."):
+                    response = process_chat(prompt).content
+                st.markdown(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})
+            except Exception as e:
+                error_msg = f"Error processing request: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
+def main():
+    """Main application entry point."""
+    st.title("AI Agents Hub")
+    
+    init_session_state()
+
+    # Agent selection
+    agent_type = st.sidebar.selectbox(
+        "Select Agent Type",
+        ["General Chat", "Knowledge Agent", "Code Analysis", "Code Review"],
+        index=0  # Make General Chat the default
+    )
+
+    # Display chat history
+    if "messages" in st.session_state:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+    # Handle different agent types
+    if agent_type == "General Chat":
+        handle_chat_agent()
+    elif agent_type == "Knowledge Agent":
+        handle_knowledge_agent()
+    elif agent_type == "Code Analysis":
+        handle_code_analysis()
+    else:  # Code Review
+        handle_code_review()
+
+if __name__ == "__main__":
+    main()
